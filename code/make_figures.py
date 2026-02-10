@@ -57,6 +57,7 @@ if __name__ == "__main__":
     parser.add_argument("annotation",       help="/path/to/annotation/directory/",   type=str)
     parser.add_argument("sample_data",      help="/path/to/sample_data.csv",         type=str)
     parser.add_argument("output_directory", help="/path/to/ouput/directory/",        type=str)
+    parser.add_argument("--highlight",      help="List of barcodes",                 type=str, nargs="+", default=[])
     args = parser.parse_args()
 
     output_directory = Path(args.output_directory)
@@ -147,8 +148,12 @@ if __name__ == "__main__":
                 for _, row in subset.iterrows():
                     x = row["segmentation_col"]
                     y = row["segmentation_row"]
-                    axes[1].plot(x, y, linestyle="", marker='o', markersize=1, color=row["subclass_color"])
-                    axes[2].plot(x, y, linestyle="", marker='o', markersize=1, color=row["subclass_color"])
+                    if row["barcode"] in args.highlight:
+                        markersize = 2
+                    else:
+                        markersize = 1
+                    axes[1].plot(x, y, linestyle="", marker='o', markersize=markersize, color=row["subclass_color"])
+                    axes[2].plot(x, y, linestyle="", marker='o', markersize=markersize, color=row["subclass_color"])
 
                 # annotate samples; prevent labels from overlapping
                 labels = subset["barcode"]
@@ -162,12 +167,20 @@ if __name__ == "__main__":
                 for xy, vector, label, idx in zip(coordinates, vectors, labels, indices):
                     line = LineString([center, center + 1.1 * slice_radius * vector])
                     intersection = np.array(slice_contour.intersection(line).coords[:][-1])
+                    if label in args.highlight:
+                         fontsize = 7
+                         fontweight = "normal"
+                    else:
+                         fontsize = 5
+                         fontweight="normal"
+
                     axes[1].annotate(
                         f"{label} ({idx})",
                         xy,
                         center + 1.1 * (intersection - center),
                         ha="right", va="bottom",
-                        fontsize=5,
+                        fontsize=fontsize,
+                        fontweight=fontweight,
                         color="#677e8c",
                         arrowprops=dict(arrowstyle="-", color="#677e8c", linewidth=0.25),
                         wrap=True,
@@ -177,7 +190,8 @@ if __name__ == "__main__":
                         xy,
                         center + 1.1 * (intersection - center),
                         ha="right", va="bottom",
-                        fontsize=5,
+                        fontsize=fontsize,
+                        fontweight=fontweight,
                         color="#677e8c",
                         arrowprops=dict(arrowstyle="-", color="#677e8c", linewidth=0.25),
                         wrap=True,
@@ -279,18 +293,33 @@ if __name__ == "__main__":
             ax.plot(*xyz, linestyle="", marker='o', color=row["subclass_color"])
 
     # label clones
-    for barcode in np.unique(df["barcode"]):
-        clone = df[df["barcode"] == barcode]
-        if len(clone) > 1:
-            Z = -clone["slice_number"]
-            X = clone["segmentation_col"]
-            Y = clone["segmentation_row"]
-            zt = Z.mean()
-            xt = xc + 2 * (X.mean() - xc)
-            yt = yc + 2 * (Y.mean() - yc)
-            ax.text(zt, xt, -yt, barcode + " ", ha="right")
-            for zz, xx, yy in zip(Z, X, Y):
-                ax.plot([zt, zz], [xt, xx], [-yt, -yy], linewidth=0.5, color="#677e8c")
+    if len(args.highlight) == 0: # label all clones
+        for barcode in np.unique(df["barcode"]):
+            clone = df[df["barcode"] == barcode]
+            if len(clone) > 1:
+                Z = -clone["slice_number"]
+                X = clone["segmentation_col"]
+                Y = clone["segmentation_row"]
+                zt = Z.mean()
+                xt = xc + 2 * (X.mean() - xc)
+                yt = yc + 2 * (Y.mean() - yc)
+                ax.text(zt, xt, -yt, barcode + " ", ha="right")
+                for zz, xx, yy in zip(Z, X, Y):
+                    ax.plot([zt, zz], [xt, xx], [-yt, -yy], linewidth=0.5, color="#677e8c")
+    else: # only label clones to be highlighted
+        for barcode in args.highlight:
+            clone = df[df["barcode"] == barcode]
+            if len(clone) > 1:
+                Z = -clone["slice_number"]
+                X = clone["segmentation_col"]
+                Y = clone["segmentation_row"]
+                zt = Z.mean()
+                xt = xc + 2 * (X.mean() - xc)
+                yt = yc + 2 * (Y.mean() - yc)
+                ax.text(zt, xt, -yt, barcode + " ", ha="right", fontsize="x-large")
+                for zz, xx, yy in zip(Z, X, Y):
+                    ax.plot([zt, zz], [xt, xx], [-yt, -yy], linewidth=0.5, color="#677e8c")
+
 
     print("Select the desired view. The figure will be saved on closing.")
     plt.show()
